@@ -20,8 +20,7 @@
 #define Elettrovalvola2 23
 #define Elettrovalvola3 18
 #define Elettrovalvola4 5
-#define Pompa 17
-#define Ventola 16
+#define Ventola 17
 
 // pin ultrasuoni
 #define trigUS 14
@@ -133,11 +132,8 @@ void umiditaTerreno(int TerrenoPianta, int elettrovalvola, int numeroPianta, int
   else if (*umiditPianta < 900 || lvlAcquaPerc <= 15)
   {
     digitalWrite(elettrovalvola, HIGH); // Spegni eletrrovalvola
-    if (digitalRead(Elettrovalvola1) == HIGH && digitalRead(Elettrovalvola2) == HIGH && digitalRead(Elettrovalvola3) == HIGH && digitalRead(Elettrovalvola4) == HIGH){
-      irrigazioneAttiva = false; // se tutte le elettrovalvole sono spente non c'è irrigazione => non serve fare il check costante per spegnere l'irrigazione
-      digitalWrite(Pompa, HIGH); //spegnimento pompa => nessuna pianta sta irrigando
-    }
-      
+    if (digitalRead(Elettrovalvola1) == HIGH && digitalRead(Elettrovalvola2) == HIGH && digitalRead(Elettrovalvola3) == HIGH && digitalRead(Elettrovalvola4) == HIGH)
+      irrigazioneAttiva = false; // se tutte le elettrovalvole sono spente non c'è irrigazione => non serve fare il check costante per spegnere l'irrigazione    
   }
 }
 
@@ -174,3 +170,5 @@ void TempHumAria()
   tempAria = SensoreTempSerra.readTemperature();
   umAria = SensoreTempSerra.readHumidity();
 }
+
+
