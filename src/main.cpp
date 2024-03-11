@@ -89,6 +89,7 @@ void loop()
     livelloAcqua();
     TempHumAria();
   }
+ // Irrigazione();
   if (oldTimePiante == 0 || (tempo - oldTimePiante) > 3600000 || irrigazioneAttiva) // check ogni 60 minuti o costante se l'irrigazione è attiva
   {
     oldTimePiante = millis();
@@ -129,8 +130,10 @@ void umiditaTerreno(int TerrenoPianta, int elettrovalvola, int numeroPianta, int
   {
     digitalWrite(elettrovalvola, LOW); // Accendi eletrrovalvola
     irrigazioneAttiva = true; // segnalo che è attiva una irrigazione
+    digitalWrite(Pompa,LOW);
+    delayMicroseconds(300);
   }
-  else if (*umiditPianta < 900 || lvlAcquaPerc <= 15)
+  else if (*umiditPianta > 900 || lvlAcquaPerc <= 15)
   {
     digitalWrite(elettrovalvola, HIGH); // Spegni eletrrovalvola
     if (digitalRead(Elettrovalvola1) == HIGH && digitalRead(Elettrovalvola2) == HIGH && digitalRead(Elettrovalvola3) == HIGH && digitalRead(Elettrovalvola4) == HIGH){
@@ -175,4 +178,13 @@ void TempHumAria()
   umAria = SensoreTempSerra.readHumidity();
 }
 
-
+// void Irrigazione(){
+//   if(irrigazioneAttiva && (digitalRead(Elettrovalvola1)==LOW || digitalRead(Elettrovalvola2)==LOW || digitalRead(Elettrovalvola3)==LOW || digitalRead(Elettrovalvola4)==LOW)){
+//     digitalWrite(Pompa,HIGH);
+//     delayMicroseconds(300);
+//   }
+//   else{
+//     digitalWrite(Pompa,LOW);
+//     delayMicroseconds(300);
+//   }
+// }
