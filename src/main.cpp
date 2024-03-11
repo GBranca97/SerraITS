@@ -2,6 +2,8 @@
 #include <Wire.h>
 #include "SparkFunHTU21D.h"
 // #include <Adafruit_Sensor.h>
+#include <WiFi.h>
+#include <PubSubClient.h>
 #define SENDIST 5 // distanza sensore cm
 
 
@@ -54,11 +56,37 @@ long oldTimeTemp = 0;
 float dist = 0;
 byte height = 20, wHeight = 0, lvlAcquaPerc;
 
+// variabili WiFi
+const char* ssid "ssid";
+const char* password "password";
+WiFiclient espClient;
+
+// variabili MQTT
+const char* mqtt_server = "mqtt_address";
+//const char* mqtt_user = "mqtt_user";
+//const char* mqtt_pass = "mqtt_pass";
+long lastReconnectAttempt = 0;
+
+// topic MQTT
+const char* ev1 = "serra/elettrovalvola1";
+const char* ev2 = "serra/elettrovalvola2";
+const char* ev3 = "serra/elettrovalvola3";
+const char* ev4 = "serra/elettrovalvola4";
+const char* vent = "serra/ventola";
+
+
+PubSubClient client(espClient);
+
 // dichiarazione funzioni
 void umiditaTerreno(int SensorePianta, int elettrovalvola, int numeroPianta, int *umiditPianta);
 // void display();
 void livelloAcqua();
 void TempHumAria();
+
+boolean reconnect();
+void setup_wifi();
+void controllaMessaggio(String messageTemp, int elettrovalvola);
+void callback(char *topic, byte *message, unsigned int lenght);
 
 void setup()
 {
@@ -75,13 +103,33 @@ void setup()
 
   pinMode(trigUS, OUTPUT);
   pinMode(echoUS, INPUT);
+
+  setup_wifi();
+  client.setServer(mqtt_server, 1883);
+  client.setCallback(callback);
 }
 
 
 
 void loop()
 {
+
+  if (!client.connected()) {
+    long now = millis();
+    if (now - lastReconnectAttempt > 5000) {
+      lastReconnectAttempt = now;
+      // Prova a riconnettersi
+      if (reconnect()) {
+        lastReconnectAttempt = 0;
+      }
+    }
+  } else {
+    // Connessione riuscita
+    client.loop();
+  }
+  
   String printString = "";
+  String MQTTString = "";
   tempo = millis();
   if (oldTimeTemp == 0 || (tempo - oldTimeTemp) > 1800000) // check serbatoio e temperatura ogni 30 minuti
    {
@@ -119,6 +167,18 @@ void loop()
                 "Livello Acqua:\t" + String(lvlAcquaPerc) + "%\n" +
                 "Umidità aria: " + String(umAria) + "\tTemp. aria:\t" + String(tempAria) + "° C";
   Serial.println(printString);
+  MQTTString = MQTTString + String(umiditPianta1) + String(umiditPianta2) + 
+               String(umiditPianta3) + String(umiditPianta4) + String(lvlAcquaPerc) + String(umAria) + String(tempAria);
+
+  client.publish("serra/StringaUnica", MQTTString);
+  client.publish("serra/Umidita1", String(umiditPianta1));
+  client.publish("serra/Umidita2", String(umiditPianta2));
+  client.publish("serra/Umidita3", String(umiditPianta3));
+  client.publish("serra/Umidita4", String(umiditPianta4));
+  client.publish("serra/Livello", String(lvlAcquaPerc));
+  client.publish("serra/UmiditaAria", String(umAria));
+  client.publish("serra/TempAria", String(tempAria));
+
   delay(2000);
 }
 
@@ -128,14 +188,14 @@ void umiditaTerreno(int TerrenoPianta, int elettrovalvola, int numeroPianta, int
   *umiditPianta = analogRead(TerrenoPianta); // Legge il valore analogico del sensore umidità terreno
   if (*umiditPianta >= soglia_critica && lvlAcquaPerc > 15)
   {
-    digitalWrite(elettrovalvola, LOW); // Accendi eletrrovalvola
+    digitalWrite(elettrovalvola, LOW); // Accendi elettrovalvola
     irrigazioneAttiva = true; // segnalo che è attiva una irrigazione
     digitalWrite(Pompa,LOW);
     delayMicroseconds(300);
   }
   else if (*umiditPianta > 900 || lvlAcquaPerc <= 15)
   {
-    digitalWrite(elettrovalvola, HIGH); // Spegni eletrrovalvola
+    digitalWrite(elettrovalvola, HIGH); // Spegni elettrovalvola
     if (digitalRead(Elettrovalvola1) == HIGH && digitalRead(Elettrovalvola2) == HIGH && digitalRead(Elettrovalvola3) == HIGH && digitalRead(Elettrovalvola4) == HIGH){
       irrigazioneAttiva = false; // se tutte le elettrovalvole sono spente non c'è irrigazione => non serve fare il check costante per spegnere l'irrigazione
       digitalWrite(Pompa, HIGH); //spegnimento pompa => nessuna pianta sta irrigando
@@ -188,3 +248,123 @@ void TempHumAria()
 //     delayMicroseconds(300);
 //   }
 // }
+
+
+// Connessione al wifi
+void setup_wifi()
+{
+  delay(10);
+
+  Serial.println();
+  Serial.print("Connecting to ");
+  Serial.println(ssid);
+
+  WiFi.begin(ssid, password);
+
+  while(WiFi.status() != WL_CONNECTED)
+  {
+    delay(500);
+    Serial.print(".");
+  }
+
+  Serial.println("");
+  Serial.println("WiFi connected");
+  Serial.print("IP address: ");
+  Serial.println(WiFi.localIP());
+
+}
+
+
+// funzione per ricevere dati dal broker MQTT
+void callback(char *topic, byte *message, unsigned int lenght)
+{
+  //Serial.print("message arrived on topic ");
+  //Serial.println(topic);
+  
+  String messageTemp;
+  String topicTemp = String(topic);
+
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)message[i]);
+    messageTemp += (char)message[i];
+  }
+
+  if(topicTemp.equalsIgnoreCase(ev1))
+  {
+    controllaMessaggio(messageTemp, Elettrovalvola1)
+
+  }
+  else if(topicTemp.equalsIgnoreCase(ev2))
+  {
+    controllaMessaggio(messageTemp, Elettrovalvola2)
+  }
+  else if(topicTemp.equalsIgnoreCase(ev3))
+  {
+    controllaMessaggio(messageTemp, Elettrovalvola3)
+  }
+  else if(topicTemp.equalsIgnoreCase(ev4))
+  {
+    controllaMessaggio(messageTemp, Elettrovalvola4)    
+  }
+  else if(topicTemp.equalsIgnoreCase(vent))
+  {
+    if(messageTemp.equalsIgnoreCase("ON"))
+  {
+    digitalWrite(Ventola, LOW);
+  }
+  else if(messageTemp.equalsIgnoreCase("OFF"))
+  {
+    digitalWrite(Ventola, HIGH);
+  }
+  }
+
+
+}
+
+void controllaMessaggio(String messageTemp, int elettrovalvola)
+{
+  if(messageTemp.equalsIgnoreCase("ON"))
+  {
+    digitalWrite(elettrovalvola, LOW); // Accendi elettrovalvola
+    irrigazioneAttiva = true; // segnalo che è attiva una irrigazione
+    digitalWrite(Pompa,LOW);
+  }
+  else if(messageTemp.equalsIgnoreCase("OFF"))
+  {
+    digitalWrite(elettrovalvola, HIGH); // Spegni elettrovalvola
+    if (digitalRead(Elettrovalvola1) == HIGH && digitalRead(Elettrovalvola2) == HIGH && digitalRead(Elettrovalvola3) == HIGH && digitalRead(Elettrovalvola4) == HIGH){
+      irrigazioneAttiva = false; // se tutte le elettrovalvole sono spente non c'è irrigazione => non serve fare il check costante per spegnere l'irrigazione
+      digitalWrite(Pompa, HIGH); //spegnimento pompa => nessuna pianta sta irrigando
+    }
+  }
+}
+
+// Connessione al broker MQTT
+boolean reconnect() {
+  // Attempt to connect
+  if (client.connect("espClient")) {
+    Serial.println("connected");
+    // Subscribe
+    if(!client.subscribe(ev1))
+    {
+      Serial.println("Errore sottoscrizione a serra/elettrovalvola1");
+    }
+    if(!client.subscribe(ev2))
+    {
+      Serial.println("Errore sottoscrizione a serra/elettrovalvola2");
+    }
+    if(!client.subscribe(ev3))
+    {
+      Serial.println("Errore sottoscrizione a serra/elettrovalvola3");
+    }
+    if(!client.subscribe(ev4))
+    {
+      Serial.println("Errore sottoscrizione a serra/elettrovalvola4");
+    }
+    if(!client.subscribe(vent))
+    {
+      Serial.println("Errore sottoscrizione a serra/ventola");
+    }
+   }
+   return client.connected();
+}
