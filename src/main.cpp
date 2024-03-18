@@ -170,14 +170,14 @@ void loop()
   MQTTString = MQTTString + String(umiditPianta1) + String(umiditPianta2) + 
                String(umiditPianta3) + String(umiditPianta4) + String(lvlAcquaPerc) + String(umAria) + String(tempAria);
 
-  client.publish("serra/StringaUnica", MQTTString);
-  client.publish("serra/Umidita1", String(umiditPianta1));
-  client.publish("serra/Umidita2", String(umiditPianta2));
-  client.publish("serra/Umidita3", String(umiditPianta3));
-  client.publish("serra/Umidita4", String(umiditPianta4));
-  client.publish("serra/Livello", String(lvlAcquaPerc));
-  client.publish("serra/UmiditaAria", String(umAria));
-  client.publish("serra/TempAria", String(tempAria));
+  client.publish("serra/StringaUnica", MQTTString, true);
+  client.publish("serra/Umidita1", String(umiditPianta1), true);
+  client.publish("serra/Umidita2", String(umiditPianta2), true);
+  client.publish("serra/Umidita3", String(umiditPianta3), true);
+  client.publish("serra/Umidita4", String(umiditPianta4), true);
+  client.publish("serra/Livello", String(lvlAcquaPerc), true);
+  client.publish("serra/UmiditaAria", String(umAria), true);
+  client.publish("serra/TempAria", String(tempAria), true);
 
   delay(2000);
 }
